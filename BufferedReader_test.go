@@ -1,4 +1,4 @@
-package file2
+package breader
 
 import (
 	"io/ioutil"

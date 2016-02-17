@@ -3,6 +3,10 @@
 breader (Buffered File Reader), asynchronous parsing and pre-processing while
  reading file. Safe cancellation is also supported.
 
+## API reference
+
+[Godoc](http://godoc.org/github.com/shenwei356/breader)
+ 
 ## Example
 
 1). Simple example with default parameters (`ChunkSize`: 1000000;
