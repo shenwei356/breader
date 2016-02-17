@@ -10,7 +10,7 @@ breader (Buffered File Reader), asynchronous parsing and pre-processing while
 ## Example
 
 1). Simple example with default parameters (`ChunkSize`: 1000000;
-    `BufferSize`: #. of CPUs, `ProcessFunc`: trim new-line symbol)
+    `BufferSize`: #. of CPUs, `ProcessFunc`: trimming new-line symbol)
 
 ```
 import "github.com/shenwei356/breader"
@@ -31,7 +31,7 @@ for chunk := range reader.Ch {
 ```
 
 2). Example with custom pre-processing function: splitting line to slice.
-    **Note that processing of interface{} containing slice**.
+    **Note the processing of interface{} containing slice**.
 
 ```
 fn := func(line string) (interface{}, bool, error) {
