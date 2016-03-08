@@ -19,10 +19,7 @@ reader, err := breader.NewDefaultBufferedReader(file)
 checkErr(err)
 
 for chunk := range reader.Ch {
-    if chunk.Err != nil {
-        checkErr(chunk.Err)
-        return
-    }
+    checkError(chunk.Err)
     for _, data := range chunk.Data {
         line := data.(string)
         fmt.Println(line)
@@ -50,10 +47,8 @@ reader, err := breader.NewBufferedReader(file, runtime.NumCPU(), 1000000, fn)
 checkErr(err)
 
 for chunk := range reader.Ch {
-    if chunk.Err != nil {
-        checkErr(chunk.Err)
-        return
-    }
+    checkError(chunk.Err)
+    
     for _, data := range chunk.Data {
         // do not simply use: data.(slice)
         switch reflect.TypeOf(data).Kind() {
@@ -103,10 +98,8 @@ reader, err := breader.NewBufferedReader(file, runtime.NumCPU(), 1000000, fn)
 checkErr(err)
 
 for chunk := range reader.Ch {
-    if chunk.Err != nil {
-        checkErr(chunk.Err)
-        return
-    }
+    checkError(chunk.Err)
+    
     for _, data := range chunk.Data {
         obj := data.(string2int)
         // handle of the string2int object
@@ -126,10 +119,7 @@ checkErr(err)
 for {
     select {
     case chunk := <-reader.Ch:
-        if chunk.Err != nil {
-            checkErr(err)
-            return
-        }
+        checkError(chunk.Err)
 
         // do some thing
 
