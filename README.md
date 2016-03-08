@@ -20,6 +20,9 @@ checkErr(err)
 
 for chunk := range reader.Ch {
     checkError(chunk.Err)
+    
+    fmt.Println(chunk.ID) // useful for keeping the order of chunk in downstream process
+    
     for _, data := range chunk.Data {
         line := data.(string)
         fmt.Println(line)

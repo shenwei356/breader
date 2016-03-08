@@ -10,7 +10,9 @@ Examples:
 
 	reader, err := breader.NewDefaultBufferedReader(file)
 	checkErr(err)
-
+	
+	fmt.Println(chunk.ID) // useful for keeping the order of chunk in downstream process
+	
 	for chunk := range reader.Ch {
 	    checkError(chunk.Err)
 	    for _, data := range chunk.Data {
@@ -132,7 +134,7 @@ import (
 
 // Chunk is a struct compossing with slice of data and error as status
 type Chunk struct {
-	ID   uint64
+	ID   uint64 // useful for keeping the order of chunk in downstream process
 	Data []interface{}
 	Err  error
 }
