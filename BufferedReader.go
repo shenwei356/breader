@@ -149,6 +149,7 @@ func (reader *BufferedReader) run() {
 	go func() {
 		var wg sync.WaitGroup
 		tokens := make(chan int, reader.BufferSize)
+		var hasErr bool
 		for chunk := range ch {
 			tokens <- 1
 			wg.Add(1)
@@ -165,6 +166,7 @@ func (reader *BufferedReader) run() {
 					if err != nil {
 						ch2 <- Chunk{chunk.ID, chunkData, err}
 						close(ch2)
+						hasErr = true
 						return
 					}
 					if ok {
@@ -173,10 +175,11 @@ func (reader *BufferedReader) run() {
 				}
 				ch2 <- Chunk{chunk.ID, chunkData, nil}
 			}(chunk)
-
 		}
 		wg.Wait()
-		close(ch2)
+		if !hasErr {
+			close(ch2)
+		}
 	}()
 
 	// read lines
