@@ -1,135 +1,20 @@
 /*Package breader (Buffered File Reader), asynchronous parsing and pre-processing while
- reading file. Safe cancellation is also supported
+ reading file. Safe cancellation is also supported.
 
-Examples:
-
-1). Simple example with default parameters (`ChunkSize`: 1000000;
-    `BufferSize`: #. of CPUs, `ProcessFunc`: trimming new-line symbol)
-
-	import "github.com/shenwei356/breader"
-
-	reader, err := breader.NewDefaultBufferedReader(file)
-	checkErr(err)
-	
-	fmt.Println(chunk.ID) // useful for keeping the order of chunk in downstream process
-	
-	for chunk := range reader.Ch {
-	    checkError(chunk.Err)
-	    for _, data := range chunk.Data {
-	        line := data.(string)
-	        fmt.Println(line)
-	    }
-	}
-
-2). Example with custom pre-processing function: splitting line to slice.
-    **Note the processing of interface{} containing slice**.
-
-	fn := func(line string) (interface{}, bool, error) {
-	    line = strings.TrimRight(line, "\n")
-	    if line == "" || line[0] == '#' { // ignoring blank line and comment line
-	        return "", false, nil
-	    }
-	    items := strings.Split(line, "\t")
-	    if len(items) != 2 {
-	        return items, false, nil
-	    }
-	    return items, true, nil
-	}
-
-	reader, err := breader.NewBufferedReader(file, runtime.NumCPU(), 1000000, fn)
-	checkErr(err)
-
-	for chunk := range reader.Ch {
-	    checkError(chunk.Err)
-
-	    for _, data := range chunk.Data {
-	        // do not simply use: data.(slice)
-	        switch reflect.TypeOf(data).Kind() {
-	        case reflect.Slice:
-	            s := reflect.ValueOf(data)
-	            items := make([]string, s.Len())
-	            for i := 0; i < s.Len(); i++ {
-	                items[i] = s.Index(i).String()
-	            }
-	            fmt.Println(items) // handle of slice
-	        }
-	    }
-	}
-
-
-3). Example with custom pre-processing function: creating object from line data.
-
-
-	type string2int struct {
-	    id    string
-	    value int
-	}
-
-	fn := func(line string) (interface{}, bool, error) {
-	    line = strings.TrimRight(line, "\n")
-	    if line == "" || line[0] == '#' {
-	        return nil, false, nil
-	    }
-	    items := strings.Split(line, "\t")
-	    if len(items) != 2 {
-	        return nil, false, nil
-	    }
-	    if items[0] == "" || items[1] == "" {
-	        return nil, false, nil
-	    }
-	    id := items[0]
-	    value, err := strconv.Atoi(items[1])
-	    if err != nil {
-	        return nil, false, err
-	    }
-	    return string2int{id, value}, true, nil
-	}
-
-
-	reader, err := breader.NewBufferedReader(file, runtime.NumCPU(), 1000000, fn)
-	checkErr(err)
-
-	for chunk := range reader.Ch {
-	    checkError(chunk.Err)
-
-	    for _, data := range chunk.Data {
-	        obj := data.(string2int)
-	        // handle of the string2int object
-	    }
-	}
-
-
-4). Example of cancellation. **Note that `range chanel` is buffered, therefore,
-`for-select-case` is used.**
-
-
-	reader, err := breader.NewBufferedReader(testfile, 0, 1, breader.DefaultFunc)
-	checkErr(err)
-
-	// note that range is bufferd. using range will be failed
-	// for chunk := range reader.Ch {
-	for {
-	    select {
-	    case chunk := <-reader.Ch:
-	        checkError(chunk.Err)
-
-	        // do some thing
-
-	        reader.Cancel()
-	    default:
-	    }
-	}
+Detail: https://github.com/shenwei356/breader
 
 */
 package breader
 
 import (
 	"errors"
-	"io"
 	"runtime"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/brentp/xopen"
+	"github.com/cznic/sortutil"
 )
 
 // Chunk is a struct compossing with slice of data and error as status
@@ -137,6 +22,12 @@ type Chunk struct {
 	ID   uint64 // useful for keeping the order of chunk in downstream process
 	Data []interface{}
 	Err  error
+}
+
+// chunk is chunk of lines
+type linesChunk struct {
+	ID   uint64 // useful for keeping the order of chunk in downstream process
+	Data []string
 }
 
 // BufferedReader is BufferedReader
@@ -154,7 +45,7 @@ type BufferedReader struct {
 
 // NewDefaultBufferedReader creates BufferedReader with default parameter
 func NewDefaultBufferedReader(file string) (*BufferedReader, error) {
-	reader, err := initBufferedReader(file, runtime.NumCPU(), 1000000, DefaultFunc)
+	reader, err := initBufferedReader(file, runtime.NumCPU(), 1000, DefaultFunc)
 	if err != nil {
 		return reader, err
 	}
@@ -174,13 +65,13 @@ func NewBufferedReader(file string, bufferSize int, chunkSize int, fn func(line 
 
 // DefaultFunc just trim the new line symbol
 var DefaultFunc = func(line string) (interface{}, bool, error) {
-	line = strings.TrimRight(line, "\n")
+	line = strings.TrimRight(line, "\r\n")
 	return line, true, nil
 }
 
 func initBufferedReader(file string, bufferSize int, chunkSize int, fn func(line string) (interface{}, bool, error)) (*BufferedReader, error) {
-	if bufferSize < 0 {
-		bufferSize = 0
+	if bufferSize < 1 {
+		bufferSize = 1
 	}
 	if chunkSize < 1 {
 		chunkSize = 1
@@ -208,6 +99,87 @@ func initBufferedReader(file string, bufferSize int, chunkSize int, fn func(line
 var ErrorCanceled = errors.New("reading canceled")
 
 func (reader *BufferedReader) run() {
+	ch2 := make(chan Chunk, reader.BufferSize)
+
+	// receive processed chunks and return them in order
+	go func() {
+		var id uint64
+		chunks := make(map[uint64]Chunk)
+
+		for chunk := range ch2 {
+			if chunk.Err != nil {
+				reader.Ch <- chunk
+				close(reader.Ch)
+				return
+			}
+			if chunk.ID == id {
+				reader.Ch <- chunk
+				id++
+			} else { // check bufferd result
+				for true {
+					if chunk1, ok := chunks[id]; ok {
+						reader.Ch <- chunk1
+						delete(chunks, chunk1.ID)
+						id++
+					} else {
+						break
+					}
+				}
+				chunks[chunk.ID] = chunk
+			}
+		}
+		if len(chunks) > 0 {
+			ids := make(sortutil.Uint64Slice, len(chunks))
+			i := 0
+			for id := range chunks {
+				ids[i] = id
+				i++
+			}
+			sort.Sort(ids)
+			for _, id := range ids {
+				chunk := chunks[id]
+				reader.Ch <- chunk
+			}
+		}
+		close(reader.Ch)
+	}()
+
+	// receive lines and process with ProcessFunc
+	ch := make(chan linesChunk, reader.BufferSize)
+	go func() {
+		var wg sync.WaitGroup
+		tokens := make(chan int, reader.BufferSize)
+		for chunk := range ch {
+			tokens <- 1
+			wg.Add(1)
+
+			go func(chunk linesChunk) {
+				defer func() {
+					wg.Done()
+					<-tokens
+				}()
+
+				var chunkData []interface{}
+				for _, line := range chunk.Data {
+					result, ok, err := reader.ProcessFunc(line)
+					if err != nil {
+						ch2 <- Chunk{chunk.ID, chunkData, err}
+						close(ch2)
+						return
+					}
+					if ok {
+						chunkData = append(chunkData, result)
+					}
+				}
+				ch2 <- Chunk{chunk.ID, chunkData, nil}
+			}(chunk)
+
+		}
+		wg.Wait()
+		close(ch2)
+	}()
+
+	// read lines
 	go func() {
 		var (
 			i    int
@@ -215,71 +187,35 @@ func (reader *BufferedReader) run() {
 			line string
 			err  error
 		)
-		chunkData := make([]interface{}, reader.ChunkSize)
+		chunkData := make([]string, reader.ChunkSize)
 		for {
 			select {
 			case <-reader.done:
 				if !reader.finished {
-					reader.Ch <- Chunk{id, chunkData[0:i], ErrorCanceled}
-					id++
-					close(reader.Ch)
 					reader.finished = true
 					reader.reader.Close()
+					close(ch)
 					return
 				}
 			default:
-
 			}
-
 			line, err = reader.reader.ReadString('\n')
 			if err != nil {
-				if err == io.EOF {
-					result, ok, err := reader.ProcessFunc(line)
-					if err != nil {
-						reader.Ch <- Chunk{id, chunkData[0:i], err}
-						id++
-						close(reader.Ch)
-						reader.finished = true
-						reader.reader.Close()
-						return
-					}
-					if ok {
-						chunkData[i] = result
-						i++
-					}
-
-					reader.Ch <- Chunk{id, chunkData[0:i], nil}
-					id++
-					close(reader.Ch)
-					reader.finished = true
-					reader.reader.Close()
-					return
-				}
-				reader.Ch <- Chunk{id, chunkData[0:i], err}
-				id++
-				close(reader.Ch)
-				reader.finished = true
-				reader.reader.Close()
-				return
-			}
-
-			result, ok, err := reader.ProcessFunc(line)
-			if err != nil {
-				reader.Ch <- Chunk{id, chunkData[0:i], err}
-				id++
-				close(reader.Ch)
-				reader.finished = true
-				reader.reader.Close()
-				return
-			}
-			if ok {
-				chunkData[i] = result
+				chunkData[i] = line
 				i++
+				ch <- linesChunk{id, chunkData[0:i]}
+
+				reader.finished = true
+				reader.reader.Close()
+				close(ch)
+				return
 			}
+			chunkData[i] = line
+			i++
 			if i == reader.ChunkSize {
-				reader.Ch <- Chunk{id, chunkData[0:i], nil}
+				ch <- linesChunk{id, chunkData[0:i]}
 				id++
-				chunkData = make([]interface{}, reader.ChunkSize)
+				chunkData = make([]string, reader.ChunkSize)
 				i = 0
 			}
 		}

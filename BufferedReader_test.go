@@ -1,9 +1,9 @@
 package breader
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -35,13 +35,17 @@ func TestUnprocessedText(t *testing.T) {
 	}
 
 	originalText, err := readFileText(testfile)
-	checkErr(t, err)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	if strings.Join(text, "") != originalText {
 		t.Error("text unmatch")
 	}
 }
 
 func TestProcessedText(t *testing.T) {
+	type Slice []string
 	fn := func(line string) (interface{}, bool, error) {
 		line = strings.TrimRight(line, "\n")
 		if line == "" || line[0] == '#' {
@@ -51,7 +55,7 @@ func TestProcessedText(t *testing.T) {
 		if len(items) != 2 {
 			return items, false, nil
 		}
-		return items, true, nil
+		return Slice(items), true, nil
 	}
 
 	reader, err := NewBufferedReader(testfile, 2, 4, fn)
@@ -67,15 +71,18 @@ func TestProcessedText(t *testing.T) {
 			return
 		}
 		for _, data := range chunk.Data {
-			switch reflect.TypeOf(data).Kind() {
-			case reflect.Slice:
-				s := reflect.ValueOf(data)
-				items := make([]string, s.Len())
-				for i := 0; i < s.Len(); i++ {
-					items[i] = s.Index(i).String()
-				}
-				n++
-			}
+			// switch reflect.TypeOf(data).Kind() {
+			// case reflect.Slice:
+			// 	s := reflect.ValueOf(data)
+			// 	items := make([]string, s.Len())
+			// 	for i := 0; i < s.Len(); i++ {
+			// 		items[i] = s.Index(i).String()
+			// 	}
+			// 	fmt.Println(items)
+			// 	n++
+			// }
+			fmt.Println(data.(Slice))
+			n++
 		}
 	}
 
@@ -85,14 +92,15 @@ func TestProcessedText(t *testing.T) {
 }
 
 func TestCancellation(t *testing.T) {
-	reader, err := NewBufferedReader(testfile, 0, 1, DefaultFunc)
+	reader, err := NewBufferedReader(testfile, 1, 1, DefaultFunc)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	i := 1
+
 	// note that range is bufferd. using range will be failed
 	// for chunk := range reader.Ch {
+LOOP:
 	for {
 		select {
 		case chunk := <-reader.Ch:
@@ -100,14 +108,8 @@ func TestCancellation(t *testing.T) {
 				t.Log(chunk.Err)
 				return
 			}
-
-			if i == 2 {
-				t.Error("cancellation failed")
-			}
-
 			reader.Cancel()
-
-			i++
+			break LOOP
 		default:
 		}
 	}
@@ -167,12 +169,6 @@ func readFileText(file string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bs, err := ioutil.ReadAll(fh)
+	bs, _ := ioutil.ReadAll(fh)
 	return string(bs), nil
-}
-
-func checkErr(t *testing.T, err error) {
-	if err != nil {
-		t.Error(err)
-	}
 }
