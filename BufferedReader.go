@@ -173,7 +173,9 @@ func (reader *BufferedReader) run() {
 						chunkData = append(chunkData, result)
 					}
 				}
-				ch2 <- Chunk{chunk.ID, chunkData, nil}
+				if !hasErr {
+					ch2 <- Chunk{chunk.ID, chunkData, nil}
+				}
 			}(chunk)
 		}
 		wg.Wait()
