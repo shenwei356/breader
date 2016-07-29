@@ -1,5 +1,5 @@
 /*Package breader (Buffered File Reader), asynchronous parsing and pre-processing while
- reading file. Safe cancellation is also supported.
+reading file. Safe cancellation is also supported.
 
 Detail: https://github.com/shenwei356/breader
 
@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/brentp/xopen"
+	"github.com/shenwei356/xopen"
 	"github.com/cznic/sortutil"
 )
 
