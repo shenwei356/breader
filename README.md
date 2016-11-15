@@ -1,7 +1,7 @@
 # breader
 
 [Godoc](http://godoc.org/github.com/shenwei356/breader)
-[![Go Report Card](https://goreportcard.com/badge/github.com/shenwei356/bio)](https://goreportcard.com/report/github.com/shenwei356/bio)
+[![Go Report Card](https://goreportcard.com/badge/github.com/shenwei356/breader)](https://goreportcard.com/report/github.com/shenwei356/breader)
 
 breader (Buffered File Reader), asynchronous parsing and pre-processing while
  reading file. Safe cancellation is also supported.
