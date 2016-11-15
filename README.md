@@ -1,15 +1,14 @@
 # breader
 
+[Godoc](http://godoc.org/github.com/shenwei356/breader)
+[![Go Report Card](https://goreportcard.com/badge/github.com/shenwei356/bio)](https://goreportcard.com/report/github.com/shenwei356/bio)
+
 breader (Buffered File Reader), asynchronous parsing and pre-processing while
  reading file. Safe cancellation is also supported.
 
-## API reference
-
-[Godoc](http://godoc.org/github.com/shenwei356/breader)
-
 ## Example
 
-1). Simple example with default parameters (`ChunkSize`: 1000;
+1). Simple example with default parameters (`ChunkSize`: 100;
     `BufferSize`: #. of CPUs, `ProcessFunc`: trimming new-line symbol)
 
 ```go
@@ -45,7 +44,7 @@ fn := func(line string) (interface{}, bool, error) {
     return Slice(items), true, nil
 }
 
-reader, err := breader.NewBufferedReader(file, runtime.NumCPU(), 1000, fn)
+reader, err := breader.NewBufferedReader(file, runtime.NumCPU(), 100, fn)
 checkErr(err)
 
 for chunk := range reader.Ch {
@@ -88,7 +87,7 @@ fn := func(line string) (interface{}, bool, error) {
 }
 
 
-reader, err := breader.NewBufferedReader(file, runtime.NumCPU(), 1000000, fn)
+reader, err := breader.NewBufferedReader(file, runtime.NumCPU(), 100, fn)
 checkErr(err)
 
 for chunk := range reader.Ch {

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/shenwei356/xopen"
 	"github.com/cznic/sortutil"
+	"github.com/shenwei356/xopen"
 )
 
 // Chunk is a struct compossing with slice of data and error as status
@@ -45,7 +45,7 @@ type BufferedReader struct {
 
 // NewDefaultBufferedReader creates BufferedReader with default parameter
 func NewDefaultBufferedReader(file string) (*BufferedReader, error) {
-	reader, err := initBufferedReader(file, runtime.NumCPU(), 1000, DefaultFunc)
+	reader, err := initBufferedReader(file, runtime.NumCPU(), 100, DefaultFunc)
 	if err != nil {
 		return reader, err
 	}
