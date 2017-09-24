@@ -147,9 +147,12 @@ func (reader *BufferedReader) run() {
 	// receive lines and process with ProcessFunc
 	ch := make(chan linesChunk, reader.BufferSize)
 	go func() {
+		defer close(ch2)
+
 		var wg sync.WaitGroup
 		tokens := make(chan int, reader.BufferSize)
-		var hasErr bool
+		errDetectedCh := make(chan int)
+		var once sync.Once
 		for chunk := range ch {
 			tokens <- 1
 			wg.Add(1)
@@ -164,24 +167,22 @@ func (reader *BufferedReader) run() {
 				for _, line := range chunk.Data {
 					result, ok, err := reader.ProcessFunc(line)
 					if err != nil {
-						ch2 <- Chunk{chunk.ID, chunkData, err}
-						close(ch2)
-						hasErr = true
+						select {
+						case <-errDetectedCh:
+						default:
+							ch2 <- Chunk{chunk.ID, chunkData, err}
+							once.Do(func() { close(errDetectedCh) })
+						}
 						return
 					}
 					if ok {
 						chunkData = append(chunkData, result)
 					}
 				}
-				if !hasErr {
-					ch2 <- Chunk{chunk.ID, chunkData, nil}
-				}
+				ch2 <- Chunk{chunk.ID, chunkData, nil}
 			}(chunk)
 		}
 		wg.Wait()
-		if !hasErr {
-			close(ch2)
-		}
 	}()
 
 	// read lines
