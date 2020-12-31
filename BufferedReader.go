@@ -9,12 +9,11 @@ package breader
 import (
 	"errors"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 
-	"github.com/cznic/sortutil"
 	"github.com/shenwei356/xopen"
+	"github.com/twotwotwo/sorts/sortutil"
 )
 
 // Chunk is a struct compossing with slice of data and error as status
@@ -129,13 +128,13 @@ func (reader *BufferedReader) run() {
 			}
 		}
 		if len(chunks) > 0 {
-			ids := make(sortutil.Uint64Slice, len(chunks))
+			ids := make([]uint64, len(chunks))
 			i := 0
 			for id := range chunks {
 				ids[i] = id
 				i++
 			}
-			sort.Sort(ids)
+			sortutil.Uint64s(ids)
 			for _, id := range ids {
 				chunk := chunks[id]
 				reader.Ch <- chunk

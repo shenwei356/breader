@@ -1,7 +1,6 @@
 package breader
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -70,20 +69,23 @@ func TestProcessedText(t *testing.T) {
 			t.Error(chunk.Err)
 			return
 		}
-		for _, data := range chunk.Data {
-			// switch reflect.TypeOf(data).Kind() {
-			// case reflect.Slice:
-			// 	s := reflect.ValueOf(data)
-			// 	items := make([]string, s.Len())
-			// 	for i := 0; i < s.Len(); i++ {
-			// 		items[i] = s.Index(i).String()
-			// 	}
-			// 	fmt.Println(items)
-			// 	n++
-			// }
-			fmt.Println(data.(Slice))
-			n++
-		}
+		// for _, data := range chunk.Data {
+		// switch reflect.TypeOf(data).Kind() {
+		// case reflect.Slice:
+		// 	s := reflect.ValueOf(data)
+		// 	items := make([]string, s.Len())
+		// 	for i := 0; i < s.Len(); i++ {
+		// 		items[i] = s.Index(i).String()
+		// 	}
+		// 	fmt.Println(items)
+		// 	n++
+		// }
+		// fmt.Println(data.(Slice))
+		// 	n++
+		// }
+
+		n += len(chunk.Data)
+
 	}
 
 	if n != 9 {
