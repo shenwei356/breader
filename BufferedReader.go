@@ -46,6 +46,11 @@ type BufferedReader struct {
 func NewDefaultBufferedReader(file string) (*BufferedReader, error) {
 	reader, err := initBufferedReader(file, runtime.NumCPU(), 100, DefaultFunc)
 	if err != nil {
+		if err == xopen.ErrNoContent {
+			reader.Ch = make(chan Chunk, 100)
+			close(reader.Ch)
+			return reader, nil
+		}
 		return reader, err
 	}
 	reader.run()
@@ -56,6 +61,11 @@ func NewDefaultBufferedReader(file string) (*BufferedReader, error) {
 func NewBufferedReader(file string, bufferSize int, chunkSize int, fn func(line string) (interface{}, bool, error)) (*BufferedReader, error) {
 	reader, err := initBufferedReader(file, bufferSize, chunkSize, fn)
 	if err != nil {
+		if err == xopen.ErrNoContent {
+			reader.Ch = make(chan Chunk, bufferSize)
+			close(reader.Ch)
+			return reader, nil
+		}
 		return reader, err
 	}
 	reader.run()
@@ -79,7 +89,7 @@ func initBufferedReader(file string, bufferSize int, chunkSize int, fn func(line
 	reader := new(BufferedReader)
 	fh, err := xopen.Ropen(file)
 	if err != nil {
-		return nil, err
+		return reader, err
 	}
 	reader.reader = fh
 
