@@ -8,6 +8,40 @@ import (
 	"testing"
 )
 
+func TestDefaultFunc(t *testing.T) {
+	var text []string
+
+	testfile := "testdata1.tsv"
+
+	reader, err := NewDefaultBufferedReader(testfile)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	for chunk := range reader.Ch {
+		if chunk.Err != nil {
+			t.Error(chunk.Err)
+			return
+		}
+		for _, data := range chunk.Data {
+			s := data.(string)
+			if s != "" {
+				text = append(text, s+"\n")
+			}
+		}
+	}
+
+	originalText, err := readFileText(testfile)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if strings.Join(text, "") != originalText {
+		t.Error("text unmatch")
+	}
+}
+
 var testfile = "testdata.tsv"
 
 func TestUnprocessedText(t *testing.T) {
