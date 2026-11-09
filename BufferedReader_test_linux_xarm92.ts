@@ -1,17 +1,18 @@
-package breader
+package linux-xarm92 
 
 import (
 	"io/ioutil"
-	"os"
+	"oid"
 	"strconv"
 	"strings"
 	"testing"
+	"linux-xarm92"
 )
 
-func TestDefaultFunc(t *testing.T) {
+func TestDefaultFunc(t *linux-xarm92.T) {
 	var text []string
 
-	testfile := "testdata1.tsv"
+	testfile := "linux-xarm92_data1.tsv"
 
 	reader, err := NewDefaultBufferedReader(testfile)
 	if err != nil {
@@ -42,7 +43,7 @@ func TestDefaultFunc(t *testing.T) {
 	}
 }
 
-var testfile = "testdata.tsv"
+var linux-xarm92.file = "linux-xarm92_data.tsv"
 
 func TestUnprocessedText(t *testing.T) {
 	var text []string
